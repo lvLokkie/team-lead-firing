@@ -11,14 +11,15 @@ import {
   InputLabel,
   Button,
   Stack,
-  Chip,
   SelectProps,
 } from '@mui/material';
 import { useSettingsStore } from '../store/useSettingsStore';
 import Autocomplete from '@mui/material/Autocomplete';
 import CircularProgress from '@mui/material/CircularProgress';
-import { getProjects } from '../services/jira';
+import { getProjects, getBoards } from '../services/jira';
 import { JiraProject } from '../types/jira.types';
+
+type JiraBoard = { id: string; name: string };
 
 // Расширяем тип пропсов для Select
 const CustomSelect = (props: SelectProps) => (
@@ -45,6 +46,8 @@ export const Settings: React.FC = () => {
   const [loadingProjects, setLoadingProjects] = React.useState(false);
   const [projectsError, setProjectsError] = React.useState<string | null>(null);
   const [projectsLoaded, setProjectsLoaded] = React.useState(false);
+
+  const [boardsByProject, setBoardsByProject] = React.useState<Record<string, { boards: JiraBoard[]; loading: boolean; error: string | null }>>({});
 
   const loadProjects = async () => {
     setLoadingProjects(true);
@@ -92,11 +95,12 @@ export const Settings: React.FC = () => {
   };
 
   const handleJiraChange = (field: string) => (
-    e: React.ChangeEvent<HTMLInputElement>
+    e: React.ChangeEvent<HTMLInputElement> | React.ChangeEvent<{ value: unknown }> | any
   ) => {
+    const value = e.target?.value ?? '';
     updateJiraSettings({
       ...settings.jira,
-      [field]: e.target.value,
+      [field]: value,
     });
     setJiraErrors((prev) => ({ ...prev, [field]: false }));
   };
@@ -121,10 +125,49 @@ export const Settings: React.FC = () => {
     setLlmErrors((prev) => ({ ...prev, [field]: false }));
   };
 
-  const handleProjectsChange = (_: any, value: JiraProject[]) => {
+  const handleProjectsChange = (_: React.SyntheticEvent, value: JiraProject[]) => {
     updateJiraSettings({
       ...settings.jira,
       projects: value.map((p) => p.id),
+    });
+  };
+
+  // Загружаем борды для выбранных проектов
+  React.useEffect(() => {
+    const fetchBoards = async (projectId: string) => {
+      setBoardsByProject((prev) => ({
+        ...prev,
+        [projectId]: { boards: [], loading: true, error: null },
+      }));
+      try {
+        const boards = await getBoards(projectId, {
+          email: settings.jira.email,
+          apiToken: settings.jira.apiToken,
+          domain: settings.jira.domain,
+        });
+        setBoardsByProject((prev) => ({
+          ...prev,
+          [projectId]: { boards, loading: false, error: null },
+        }));
+      } catch {
+        setBoardsByProject((prev) => ({
+          ...prev,
+          [projectId]: { boards: [], loading: false, error: 'Ошибка загрузки бордов' },
+        }));
+      }
+    };
+    settings.jira.projects.forEach((projectId) => {
+      if (!boardsByProject[projectId]) fetchBoards(projectId);
+    });
+  }, [settings.jira.projects, settings.jira.email, settings.jira.apiToken, settings.jira.domain]);
+
+  const handleBoardsChange = (projectId: string, value: JiraBoard[]) => {
+    updateJiraSettings({
+      ...settings.jira,
+      boardsByProject: {
+        ...settings.jira.boardsByProject,
+        [projectId]: value.map((b) => b.id),
+      },
     });
   };
 
@@ -236,6 +279,45 @@ export const Settings: React.FC = () => {
                     />
                   )}
                 />
+                {settings.jira.projects.map((projectId) => {
+                  const project = projects.find((p) => p.id === projectId);
+                  const boardsState = boardsByProject[projectId] || { boards: [], loading: false, error: null };
+                  return (
+                    <Box key={projectId} sx={{ mt: 2, mb: 2 }}>
+                      <Typography variant="subtitle1" gutterBottom>
+                        Борды для проекта {project?.name || projectId}
+                      </Typography>
+                      <Autocomplete<JiraBoard, true, false, false>
+                        multiple
+                        options={boardsState.boards}
+                        getOptionLabel={(option) => option.name}
+                        value={boardsState.boards.filter((b) => (settings.jira.boardsByProject?.[projectId] || []).includes(b.id))}
+                        onChange={(_, value) => handleBoardsChange(projectId, value)}
+                        loading={boardsState.loading}
+                        isOptionEqualToValue={(o, v) => o.id === v.id}
+                        disabled={boardsState.loading}
+                        renderInput={(params) => (
+                          <TextField
+                            {...params}
+                            label="Борды для отслеживания"
+                            placeholder="Выберите борды"
+                            error={!!boardsState.error}
+                            helperText={boardsState.error}
+                            InputProps={{
+                              ...params.InputProps,
+                              endAdornment: (
+                                <>
+                                  {boardsState.loading ? <CircularProgress color="inherit" size={20} /> : null}
+                                  {params.InputProps.endAdornment}
+                                </>
+                              ),
+                            }}
+                          />
+                        )}
+                      />
+                    </Box>
+                  );
+                })}
                 <Button type="submit" variant="contained" color="primary" data-testid="jira-submit">
                   Сохранить настройки Jira
                 </Button>

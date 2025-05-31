@@ -15,6 +15,7 @@ const defaultSettings: AppSettings = {
     apiToken: '',
     domain: '',
     projects: [],
+    boardsByProject: {},
   },
   notion: {
     apiKey: '',

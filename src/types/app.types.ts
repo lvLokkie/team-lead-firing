@@ -4,6 +4,7 @@ export type AppSettings = {
     apiToken: string;
     domain: string;
     projects: string[];
+    boardsByProject?: Record<string, string[]>;
   };
   notion: {
     apiKey: string;
