@@ -6,6 +6,11 @@ import path from 'path'
 export default defineConfig({
   plugins: [react()],
   base: '/team-lead-firing/',
+  server: {
+    port: 5173,
+    host: "tlf.ai",
+    allowedHosts: ['tlf.ai'],
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

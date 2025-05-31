@@ -1,0 +1,180 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+## Технологический стек:
+- React 18 + TypeScript
+- Vite (для быстрой сборки и деплоя на GitHub Pages)
+- Material-UI v5 для интерфейса
+- React Router v6 для навигации
+- Recharts для визуализации метрик
+- Axios для API запросов
+- Zustand для state management
+- React Query для кеширования API запросов
+- date-fns для работы с датами
+- LocalStorage для персистентного хранения данных
+
+## Основные страницы:
+
+### 1. Settings (стартовая страница)
+- Поля для API ключей:
+  - Jira API token + email + domain
+  - Notion API key + database IDs
+  - LLM API key (OpenAI/Gemini/Google AI)
+- Выбор LLM провайдера
+- Список проектов Jira для отслеживания
+- Сохранение в localStorage
+
+### 2. Dashboard
+- Карточки с ключевыми метриками по всем командам:
+  - Sprint Progress (% выполнения)
+  - Velocity (среднее за последние 3 спринта)
+  - Sprint Health (на основе burndown)
+  - Количество блокеров
+- Краткое описание каждой метрики и как ее интерпретировать
+
+### 3. Sprint Reports
+- Таблица со структурой для Notion:
+  - Название команды
+  - Название спринта
+  - Статус спринта
+  - Формулировка цели
+  - Статус выполнения цели
+  - Когда первый раз добавлена в спринт
+  - Заметки/Комментарии
+  - Ссылка на эпик/задачу
+  - Число переносов между спринтами
+  - Приоритет
+  - Владелец цели
+- Кнопка "Сгенерировать отчет с AI" - использует LLM для анализа
+- Кнопка "Экспортировать в Notion"
+- Фильтры по командам и спринтам
+
+### 4. Projects Overview
+- Канбан-доска или таблица с проектами
+- Для каждого проекта:
+  - Статус (On Track / At Risk / Blocked)
+  - Список активных рисков
+  - Список блокеров
+  - Progress bar по эпикам
+- AI-анализ рисков (кнопка для генерации)
+
+### 5. Estimates (План/Факт)
+- Таблица с колонками:
+  - Задача (название + ссылка на Jira)
+  - Исполнитель
+  - План (часы)
+  - Факт (часы из worklog)
+  - Отклонение (%)
+  - AI комментарий к расхождению
+- Фильтры по спринту/команде/исполнителю
+- Экспорт в CSV/Google Sheets формат
+
+### 6. History & Trends
+- Графики по командам:
+  - Velocity trend
+  - Burndown charts последних спринтов
+  - План/факт accuracy trend
+- Сохраненные метрики предыдущих спринтов
+
+## API интеграции:
+
+### Jira API:
+```typescript
+// services/jira.ts
+- getProjects()
+- getSprints(projectKey)
+- getSprintIssues(sprintId)
+- getIssueDetails(issueKey)
+- getWorklogs(issueKey)
+- getEpics(projectKey)
+Notion API:
+typescript// services/notion.ts
+- createSprintReport(data)
+- updateSprintReport(pageId, data)
+LLM API:
+typescript// services/llm.ts
+- analyzeSprintGoals(sprintData)
+- generateRiskAnalysis(projectData)
+- explainEstimateDeviation(task, plan, fact)
+Структура проекта:
+/src
+  /components
+    /common (Header, Sidebar, Card)
+    /dashboard (MetricCard, TeamCard)
+    /reports (SprintTable, GoalRow)
+    /charts (BurndownChart, VelocityChart)
+  /pages
+    - Settings.tsx
+    - Dashboard.tsx
+    - SprintReports.tsx
+    - ProjectsOverview.tsx
+    - Estimates.tsx
+    - History.tsx
+  /services
+    - jira.ts
+    - notion.ts
+    - llm.ts
+    - storage.ts
+  /store
+    - useSettingsStore.ts
+    - useDataStore.ts
+  /utils
+    - metrics.ts (расчет метрик)
+    - formatters.ts
+  /types
+    - jira.types.ts
+    - notion.types.ts
+    - app.types.ts
+
+## Ключевые функции:
+
+1. **Автоматический расчет метрик:**
+   - Sprint completion rate
+   - Team velocity
+   - Burndown deviation
+   - Estimate accuracy
+
+2. **AI-powered анализ:**
+   - Автоматическая генерация комментариев к целям спринта
+   - Анализ рисков на основе данных Jira
+   - Объяснение расхождений план/факт
+
+3. **Локальное хранение:**
+   - Все данные в localStorage
+   - История метрик по спринтам
+   - Кеширование запросов к API
+
+4. **Экспорт данных:**
+   - Sprint reports → Notion
+   - Estimates → CSV/Google Sheets format
+   - Метрики → JSON для бэкапа
+
+## UI/UX требования:
+- Responsive design для desktop/tablet
+- Dark mode support
+- Loading states для всех API запросов
+- Error handling с понятными сообщениями
+- Tooltips с объяснением метрик
+
+## GitHub Actions для деплоя:
+```yaml
+name: Deploy to GitHub Pages
+on:
+  push:
+    branches: [ main ]
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+      - run: npm ci
+      - run: npm run build
+      - uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+
+          publish_dir: ./dist

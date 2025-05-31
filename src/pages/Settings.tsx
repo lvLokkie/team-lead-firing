@@ -15,6 +15,10 @@ import {
   SelectProps,
 } from '@mui/material';
 import { useSettingsStore } from '../store/useSettingsStore';
+import Autocomplete from '@mui/material/Autocomplete';
+import CircularProgress from '@mui/material/CircularProgress';
+import { getProjects } from '../services/jira';
+import { JiraProject } from '../types/jira.types';
 
 // Расширяем тип пропсов для Select
 const CustomSelect = (props: SelectProps) => (
@@ -35,6 +39,32 @@ export const Settings: React.FC = () => {
   const [jiraErrors, setJiraErrors] = React.useState({ email: false, apiToken: false, domain: false });
   const [notionErrors, setNotionErrors] = React.useState({ apiKey: false });
   const [llmErrors, setLlmErrors] = React.useState({ provider: false, apiKey: false });
+
+  // --- State for Jira projects ---
+  const [projects, setProjects] = React.useState<JiraProject[]>([]);
+  const [loadingProjects, setLoadingProjects] = React.useState(false);
+  const [projectsError, setProjectsError] = React.useState<string | null>(null);
+  const [projectsLoaded, setProjectsLoaded] = React.useState(false);
+
+  const loadProjects = async () => {
+    setLoadingProjects(true);
+    setProjectsError(null);
+    try {
+      const data = await getProjects({
+        email: settings.jira.email,
+        apiToken: settings.jira.apiToken,
+        domain: settings.jira.domain,
+      });
+      setProjects(data);
+      setProjectsLoaded(true);
+    } catch {
+      setProjectsError('Ошибка загрузки проектов Jira');
+      setProjects([]);
+      setProjectsLoaded(false);
+    } finally {
+      setLoadingProjects(false);
+    }
+  };
 
   const handleJiraSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -90,6 +120,26 @@ export const Settings: React.FC = () => {
     });
     setLlmErrors((prev) => ({ ...prev, [field]: false }));
   };
+
+  const handleProjectsChange = (_: any, value: JiraProject[]) => {
+    updateJiraSettings({
+      ...settings.jira,
+      projects: value.map((p) => p.id),
+    });
+  };
+
+  React.useEffect(() => {
+    if (
+      settings.jira.email &&
+      settings.jira.apiToken &&
+      settings.jira.domain &&
+      !projectsLoaded &&
+      !loadingProjects
+    ) {
+      loadProjects();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings.jira.email, settings.jira.apiToken, settings.jira.domain]);
 
   return (
     <Box sx={{ p: 3, maxWidth: 800, mx: 'auto' }} data-testid="settings-page">
@@ -147,6 +197,44 @@ export const Settings: React.FC = () => {
                     'data-testid': 'jira-domain',
                   }}
                   error={jiraErrors.domain}
+                />
+                {(!settings.jira.email || !settings.jira.apiToken || !settings.jira.domain || !projectsLoaded) && (
+                  <Button
+                    variant="outlined"
+                    onClick={loadProjects}
+                    disabled={loadingProjects || !settings.jira.email || !settings.jira.apiToken || !settings.jira.domain}
+                    sx={{ mb: 1 }}
+                  >
+                    {loadingProjects ? 'Загрузка...' : 'Загрузить проекты'}
+                  </Button>
+                )}
+                <Autocomplete
+                  multiple
+                  options={projects}
+                  getOptionLabel={(option) => option.name + ' (' + option.key + ')'}
+                  value={projects.filter((p) => settings.jira.projects.includes(p.id))}
+                  onChange={handleProjectsChange}
+                  loading={loadingProjects}
+                  isOptionEqualToValue={(o, v) => o.id === v.id}
+                  disabled={!projectsLoaded}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="Проекты Jira для отслеживания"
+                      placeholder="Выберите проекты"
+                      error={!!projectsError}
+                      helperText={projectsError || (!projectsLoaded ? 'Сначала загрузите проекты' : undefined)}
+                      InputProps={{
+                        ...params.InputProps,
+                        endAdornment: (
+                          <>
+                            {loadingProjects ? <CircularProgress color="inherit" size={20} /> : null}
+                            {params.InputProps.endAdornment}
+                          </>
+                        ),
+                      }}
+                    />
+                  )}
                 />
                 <Button type="submit" variant="contained" color="primary" data-testid="jira-submit">
                   Сохранить настройки Jira

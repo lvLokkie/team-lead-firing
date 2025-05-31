@@ -76,4 +76,31 @@ test.describe('Settings Page', () => {
       apiKey: 'llm-api-key',
     });
   });
+
+  test('Jira projects: кнопка появляется если не все поля заполнены', async ({ page }) => {
+    await page.waitForSelector('form[data-testid="jira-form"]');
+    // Заполняем только email
+    await page.fill('[data-testid="jira-email"]', 'test@example.com');
+    // Кнопка должна быть disabled (нет токена и домена)
+    const button = await page.locator('button:has-text("Загрузить проекты")');
+    await expect(button).toBeVisible();
+    await expect(button).toBeDisabled();
+    // Autocomplete заблокирован
+    const autocomplete = await page.locator('input[placeholder="Выберите проекты"]');
+    await expect(autocomplete).toBeDisabled();
+  });
+
+  test('Jira projects: автозагрузка если все поля заполнены', async ({ page }) => {
+    await page.waitForSelector('form[data-testid="jira-form"]');
+    await page.fill('[data-testid="jira-email"]', 'test@example.com');
+    await page.fill('[data-testid="jira-token"]', 'jira-api-token');
+    await page.fill('[data-testid="jira-domain"]', 'company.atlassian.net');
+    // Ждем появления Autocomplete (он должен быть активен)
+    const autocomplete = await page.locator('input[placeholder="Выберите проекты"]');
+    await expect(autocomplete).toBeEnabled();
+    // Кнопки нет
+    const button = await page.locator('button:has-text("Загрузить проекты")');
+    await expect(button).toHaveCount(0);
+  });
+
 }); 
