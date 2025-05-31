@@ -10,6 +10,13 @@ export default defineConfig({
     port: 5173,
     host: "tlf.ai",
     allowedHosts: ['tlf.ai'],
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+        secure: false,
+      },
+    },
   },
   resolve: {
     alias: {

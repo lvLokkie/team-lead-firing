@@ -21,11 +21,29 @@ export function calcSprintHealth(_burndown: any): number {
   return 0;
 }
 
-// Подсчет количества блокеров (issues с label/blocker или статусом Blocked)
-export function calcBlockers(issues: any[]): number {
-  return issues.filter(i => {
-    const status = (i.fields?.status?.name || '').toLowerCase();
-    const labels = i.fields?.labels || [];
-    return status.includes('block') || labels.some((l: string) => l.toLowerCase().includes('block'));
-  }).length;
+// Простой расчет Sprint Health
+// Возвращает: 2 — On Track, 1 — Warning, 0 — At Risk
+export function calcSimpleSprintHealth(issues: any[], startDate: string, endDate: string, now?: string): number {
+  if (!startDate || !endDate || !issues.length) return 2;
+  const doneStatuses = ['done', 'closed', 'resolved', 'Готово', 'Выполнено'];
+  const done = issues.filter(i => doneStatuses.includes((i.fields?.status?.name || '').toLowerCase())).length;
+  const total = issues.length;
+  const start = new Date(startDate).getTime();
+  const end = new Date(endDate).getTime();
+  const current = now ? new Date(now).getTime() : Date.now();
+  const mid = start + (end - start) / 2;
+  const progress = done / total;
+  if (current < mid) {
+    // Первая половина спринта
+    if (progress < 0.3) return 0; // At Risk
+    return 2; // On Track
+  } else if (current < end) {
+    // Вторая половина спринта
+    if (progress < 0.8) return 1; // Warning
+    return 2; // On Track
+  } else {
+    // Спринт завершён
+    if (progress < 1) return 1; // Warning (не всё завершено)
+    return 2; // On Track
+  }
 } 
